@@ -1,27 +1,71 @@
 
 from controller import Robot
+import math
 
 robot = Robot()
 timestep = int(robot.getBasicTimeStep())
 
+# Motors
 left_motor = robot.getDevice("left wheel motor")
 right_motor = robot.getDevice("right wheel motor")
 
-# Access wheel encoders
+left_motor.setPosition(float("inf"))
+right_motor.setPosition(float("inf"))
+
+# Wheel encoders
 left_encoder = robot.getDevice("left wheel sensor")
 right_encoder = robot.getDevice("right wheel sensor")
 
-# Enable encoder measurements
 left_encoder.enable(timestep)
 right_encoder.enable(timestep)
 
-# Enable velocity control
-left_motor.setPosition(float('inf'))
-right_motor.setPosition(float('inf'))
+# Approximate e-puck dimensions (metres)
+WHEEL_RADIUS = 0.0205
+WHEEL_DISTANCE = 0.052
 
 SPEED = 3.0
 
-# Function to control robot movement
+# Initial estimated pose
+x = 0.0
+y = 0.0
+theta = 0.0
+
+# Allow encoders to initialize
+robot.step(timestep)
+
+previous_left = left_encoder.getValue()
+previous_right = right_encoder.getValue()
+
+
+def update_odometry():
+    global x, y, theta, previous_left, previous_right
+
+    # Read current wheel angles
+    current_left = left_encoder.getValue()
+    current_right = right_encoder.getValue()
+
+    # Calculate change in wheel rotation
+    delta_left = current_left - previous_left
+    delta_right = current_right - previous_right
+
+    # Convert wheel rotation to distance
+    distance_left = WHEEL_RADIUS * delta_left
+    distance_right = WHEEL_RADIUS * delta_right
+
+    # Calculate forward movement and heading change
+    delta_distance = (distance_left + distance_right) / 2
+    delta_theta = (distance_right - distance_left) / WHEEL_DISTANCE
+
+    # Update estimated position
+    x += delta_distance * math.cos(theta + delta_theta / 2)
+    y += delta_distance * math.sin(theta + delta_theta / 2)
+    theta += delta_theta
+
+    # Store encoder readings for next step
+    previous_left = current_left
+    previous_right = current_right
+
+
 def move(left_speed, right_speed, duration):
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)
@@ -31,24 +75,28 @@ def move(left_speed, right_speed, duration):
     for _ in range(steps):
         if robot.step(timestep) == -1:
             return
-        left_rotation = left_encoder.getValue()
-        right_rotation = right_encoder.getValue()
 
-        print("Left:", round(left_rotation, 3),
-          "Right:", round(right_rotation, 3))
+        update_odometry()
 
-# Move forward for 3 seconds
+    print(
+        f"Estimated pose: x={x:.3f} m, "
+        f"y={y:.3f} m, theta={math.degrees(theta):.1f} deg"
+    )
+
+
+# L-shaped trajectory
 move(SPEED, SPEED, 3.0)
-
-# Rotate approximately 90 degrees
 move(-SPEED, SPEED, 0.68)
-
-# Move forward for another 3 seconds
 move(SPEED, SPEED, 3.0)
 
-# Stop the robot
+# Stop
 left_motor.setVelocity(0)
 right_motor.setVelocity(0)
+
+print("Final estimated pose:")
+print(f"x = {x:.3f} m")
+print(f"y = {y:.3f} m")
+print(f"theta = {math.degrees(theta):.1f} degrees")
 
 while robot.step(timestep) != -1:
     pass
