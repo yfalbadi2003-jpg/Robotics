@@ -7,6 +7,14 @@ timestep = int(robot.getBasicTimeStep())
 left_motor = robot.getDevice("left wheel motor")
 right_motor = robot.getDevice("right wheel motor")
 
+# Access wheel encoders
+left_encoder = robot.getDevice("left wheel sensor")
+right_encoder = robot.getDevice("right wheel sensor")
+
+# Enable encoder measurements
+left_encoder.enable(timestep)
+right_encoder.enable(timestep)
+
 # Enable velocity control
 left_motor.setPosition(float('inf'))
 right_motor.setPosition(float('inf'))
@@ -23,6 +31,11 @@ def move(left_speed, right_speed, duration):
     for _ in range(steps):
         if robot.step(timestep) == -1:
             return
+        left_rotation = left_encoder.getValue()
+        right_rotation = right_encoder.getValue()
+
+        print("Left:", round(left_rotation, 3),
+          "Right:", round(right_rotation, 3))
 
 # Move forward for 3 seconds
 move(SPEED, SPEED, 3.0)
