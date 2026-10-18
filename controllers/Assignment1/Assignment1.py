@@ -1,8 +1,8 @@
 
-from controller import Robot
+from controller import Supervisor
 import math
 
-robot = Robot()
+robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())
 
 # Motors
@@ -18,6 +18,10 @@ right_encoder = robot.getDevice("right wheel sensor")
 
 left_encoder.enable(timestep)
 right_encoder.enable(timestep)
+
+# Ground truth (used only for evaluation)
+robot_node = robot.getSelf()
+translation_field = robot_node.getField("translation")
 
 # Approximate e-puck dimensions (metres)
 WHEEL_RADIUS = 0.0205
@@ -35,6 +39,9 @@ robot.step(timestep)
 
 previous_left = left_encoder.getValue()
 previous_right = right_encoder.getValue()
+
+# Initial ground-truth position
+initial_position = translation_field.getSFVec3f()
 
 
 def update_odometry():
@@ -65,6 +72,26 @@ def update_odometry():
     previous_left = current_left
     previous_right = current_right
 
+def evaluate_localization():
+    actual_position = translation_field.getSFVec3f()
+
+    # Actual displacement from starting position
+    actual_dx = actual_position[0] - initial_position[0]
+    actual_dz = actual_position[2] - initial_position[2]
+
+    # Ground-truth displacement in Webots coordinates
+    actual_distance = math.sqrt(actual_dx**2 + actual_dz**2)
+
+    # Odometry displacement
+    estimated_distance = math.sqrt(x**2 + y**2)
+
+    # Compare distances from the starting point
+    distance_error = abs(estimated_distance - actual_distance)
+
+    print("\n--- Localization Evaluation ---")
+    print(f"Estimated distance: {estimated_distance:.3f} m")
+    print(f"Actual distance: {actual_distance:.3f} m")
+    print(f"Distance difference: {distance_error:.3f} m")
 
 def move(left_speed, right_speed, duration):
     left_motor.setVelocity(left_speed)
@@ -97,6 +124,8 @@ print("Final estimated pose:")
 print(f"x = {x:.3f} m")
 print(f"y = {y:.3f} m")
 print(f"theta = {math.degrees(theta):.1f} degrees")
+
+evaluate_localization()
 
 while robot.step(timestep) != -1:
     pass
